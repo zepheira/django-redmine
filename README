@@ -1,0 +1,13 @@
+Freemix Redmine
+===============
+Support for pushing issues into a Redmine installation.
+
+About Redmine
+http://www.redmine.org/
+
+About the Redmine REST API
+http://www.redmine.org/wiki/1/Rest_api
+
+Usage
+-----
+* Add freemix_redmine to INSTALLED_APPS
