@@ -10,7 +10,9 @@ The API usage examples make use of ActiveResource libraries and the API
 is clearly geared towards making use of an underlying knowledge base of
 ActiveResource, so the description is a bit light on details.  As such,
 only the most vital portions of this library have tests associated with
-them, specifically issue creation.
+them, specifically issue creation.  There is an active bug around the
+use of custom fields in issue management.  Adding issue custom fields
+right now will do nothing.
 
 A Redmine URL, user, password, and user API key are needed to initialize
 the RedmineClient.  To run this set of doctests, you will have to supply
@@ -34,12 +36,19 @@ class RedmineResource:
     def add_element(self, element, id = None, name = None, value = None, is_custom = False):
         element = self.resource.createElement(element)
         if id is not None:
-            element.setAttribute('id', id)
+            if type(id).__name__ == "int":
+                element.setAttribute('id', '%d' % id)
+            else:
+                element.setAttribute('id', id)
         if name is not None:
             element.setAttribute('name', name)
         if value is not None:
-            val = self.resource.createTextNode(value)
-            element.appendChild(val)
+            if type(value).__name__ == "int":
+                val = self.resource.createTextNode('%d' % value)
+                element.appendChild(val)
+            else:
+                val = self.resource.createTextNode(value)
+                element.appendChild(val)
         if is_custom:
             customEl = self.resource.getElementsByTagName('custom_fields')
             if len(customEl) > 0:
@@ -133,7 +142,7 @@ class RedmineClient:
         Get one project based on the numerical ID or short identifier
         GET $base/projects/$id.xml
         """
-        if (type(id).__name__ == "int"):
+        if type(id).__name__ == "int":
             url = "%s/projects/%d.xml?key=%s" % (self.base, id, self.key)
         else:
             url = "%s/projects/%s.xml?key=%s" % (self.base, id, self.key)
@@ -149,34 +158,43 @@ class RedmineClient:
         """
         url = "%s/projects.xml?key=" % (self.base, self.key)
         response, content = self.http.request(url, "POST", project.to_xml())
-        # return http response object?
-        return response
+        if response.status == 201:
+            new_project = RedmineProject(None)
+            new_project.parse(content)
+            return new_project.get_element('id')
+        else:
+            # It would be better to have details about failure modes here instead of a global None
+            return None            
 
     def update_project(self, id, project):
         """
         Update a project
         PUT $base/projects/$id.xml
         """
-        if (type(id).__name__ == "int"):
+        if type(id).__name__ == "int":
             url = "%s/projects/%d.xml?key=%s" % (self.base, id, self.key)
         else:
             url = "%s/projects/%s.xml?key=%s" % (self.base, id, self.key)
         response, content = self.http.request(url, "PUT", project.to_xml())
-        # return http response object?
-        return response
+        if response.status == 200:
+            return True
+        else:
+            return False
 
     def delete_project(self, id):
         """
         Delete a project
         DELETE $base/projects/$id.xml
         """
-        if (type(id).__name__ == "int"):
+        if type(id).__name__ == "int":
             url = "%s/projects/%d.xml?key=%s" % (self.base, id, self.key)
         else:
             url = "%s/projects/%s.xml?key=%s" % (self.base, id, self.key)
         response, content = self.http.request(url, "DELETE")
-        # return http response object?
-        return response
+        if response.status == 200:
+            return True
+        else:
+            return False
 
     # ---- Issues ----
 
@@ -185,20 +203,21 @@ class RedmineClient:
         Get paginated list of all issues
         GET $base/issues.xml?page=$page&project_id=$project&tracker_id=$tracker&status_id=$status
 
+        Creating an issue should probably be part of this test...
         >>> r = RedmineClient('http://support.recollection.zepheira.com', 'test_username', 'test_password', 'test_key')
         >>> l = r.get_issues(1)
         >>> len(l) > 0
         True
         """
         url = "%s/issues.xml?key=%s&page=%d" % (self.base, self.key, page)
-        if (type(project_id).__name__ == "int"):
+        if type(project_id).__name__ == "int":
             url = "%s&project_id=%d" % (url, project_id)
         else:
             url = "%s&project_id=%s" % (url, project_id)
-        if (tracker is not None):
+        if tracker is not None:
             url = "%s&tracker_id=%d" % (url, tracker)
-        if (status is not None):
-            if (type(status).__name__ == "int"):
+        if status is not None:
+            if type(status).__name__ == "int":
                 url = "%s&status_id=%d" % (url, status)
             else:
                 url = "%s&status_id=%s" % (url, status)
