@@ -63,7 +63,7 @@ class RedmineResource:
     def get_element(self, element_name):
         els = self.resource.getElementsByTagName(element_name)
         if len(els) > 0:
-            return els[0]
+            return els[0].firstChild.data
         else:
             return None
 
