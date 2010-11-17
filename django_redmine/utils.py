@@ -123,7 +123,7 @@ class RedmineClient:
         Get a [list] of all projects
         GET $base/projects.xml
 
-        >>> r = RedmineClient('http://support.recollection.zepheira.com', 'test_username', 'test_password', 'test_key')
+        >>> r = RedmineClient('http://redmine.example.com', 'test_username', 'test_password', 'test_key')
         >>> p = r.get_projects()
         >>> len(p) > 0
         True
@@ -204,7 +204,7 @@ class RedmineClient:
         GET $base/issues.xml?page=$page&project_id=$project&tracker_id=$tracker&status_id=$status
 
         Creating an issue should probably be part of this test...
-        >>> r = RedmineClient('http://support.recollection.zepheira.com', 'test_username', 'test_password', 'test_key')
+        >>> r = RedmineClient('http://redmine.example.com', 'test_username', 'test_password', 'test_key')
         >>> l = r.get_issues(1)
         >>> len(l) > 0
         True
@@ -234,7 +234,7 @@ class RedmineClient:
         Get one issue
         GET $base/issues/$id.xml
 
-        >>> r = RedmineClient('http://support.recollection.zepheira.com', 'test_username', 'test_password', 'test_key')
+        >>> r = RedmineClient('http://redmine.example.com', 'test_username', 'test_password', 'test_key')
         >>> i = r.get_issue(12)
         >>> i.get_element('id').firstChild.data
         u'12'
@@ -250,7 +250,7 @@ class RedmineClient:
         Create an issue
         POST $base/issues.xml?project_id=$project_id
 
-        >>> r = RedmineClient('http://support.recollection.zepheira.com', 'test_username', 'test_password', 'test_key')
+        >>> r = RedmineClient('http://redmine.example.com', 'test_username', 'test_password', 'test_key')
         >>> i = RedmineIssue(None)
         >>> i.set_project('1')
         >>> i.add_element('tracker', '3')
