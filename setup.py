@@ -1,15 +1,16 @@
 """
-Setup for the Freemix Redmine app.
+Setup for the Django Redmine app.
 """
 from setuptools import setup, find_packages
 
 setup(
-    name = "freemix-redmine",
+    name = "django-redmine",
     version = "1.0.0-dev",
-    description = "Freemix Redmine",
-    url = "http://foundry.zepheira.com/hg/freemix-redmine",
-    packages = find_packages(),
-    install_requires = [
-        "freemix > 1.1"
-    ]
+    description = u"Django Redmine",
+    keywords = u"django redmine",
+    license = "BSD",
+    author = u"Ryan Lee",
+    author_email = u"ryanlee@zepheira.com",
+    url = "https://github.com/zepheira/django-redmine",
+    packages = find_packages()
 )
