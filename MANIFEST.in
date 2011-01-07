@@ -1,0 +1,6 @@
+include setup.py README MANIFEST.in
+recursive-include django_redmine/*?/media *
+recursive-include django_redmine/*?/templates *
+
+recursive-include requirements *
+prune django_redmine/site_media

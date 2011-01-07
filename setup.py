@@ -12,5 +12,6 @@ setup(
     author = u"Ryan Lee",
     author_email = u"ryanlee@zepheira.com",
     url = "https://github.com/zepheira/django-redmine",
-    packages = find_packages()
+    packages = find_packages(),
+    include_package_data=True
 )
