@@ -5,7 +5,7 @@ from setuptools import setup, find_packages
 
 setup(
     name = "django-redmine",
-    version = "1.0.0-dev",
+    version = "1.0.0",
     description = u"Django Redmine",
     keywords = u"django redmine",
     license = "BSD",
