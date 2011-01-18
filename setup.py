@@ -11,9 +11,8 @@ from distutils.command.build import build
 import os
 
 def write_version_file():
-    version_info = __import__('django_redmine').__version_info__
     f = open("django_redmine/version.py", "w")
-    f.write('__version_info__ = %s\n' % (version_info,))
+    f.write('__version__ = %s\n' % (VERSION,))
     f.close()
 
 def remove_version_file():
@@ -36,7 +35,7 @@ class build_version(build):
 
 setup(
     name = "django-redmine",
-    version = "1.0.0",
+    version = VERSION,
     description = u"Django Redmine",
     keywords = u"django redmine",
     license = "BSD",
