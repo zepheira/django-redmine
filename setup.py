@@ -12,7 +12,7 @@ import os
 
 def write_version_file():
     f = open("django_redmine/version.py", "w")
-    f.write('__version__ = %s\n' % (VERSION,))
+    f.write('__version__ = "%s"\n' % (VERSION,))
     f.close()
 
 def remove_version_file():
