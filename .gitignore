@@ -33,4 +33,5 @@ site_media/static/*
 site_media/support/*
 *.mo
 dist/*
+build/*
 MANIFEST
