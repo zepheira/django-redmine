@@ -45,9 +45,13 @@ class RedmineResource:
         if value is not None:
             if type(value).__name__ == "int":
                 val = self.resource.createTextNode('%d' % value)
-                element.appendChild(val)
             else:
                 val = self.resource.createTextNode(value)
+            if is_custom:
+                valEl = self.resource.createElement('value')
+                valEl.appendChild(val)
+                element.appendChild(valEl)
+            else:
                 element.appendChild(val)
         if is_custom:
             customEl = self.resource.getElementsByTagName('custom_fields')
@@ -55,6 +59,7 @@ class RedmineResource:
                 customEl[0].appendChild(element)
             else:
                 customEl = self.resource.createElement('custom_fields')
+                customEl.setAttribute('type', 'array')
                 customEl.appendChild(element)
                 self.resource.documentElement.appendChild(customEl)
         else:
@@ -198,7 +203,7 @@ class RedmineClient:
 
     # ---- Issues ----
 
-    def get_issues(self, project_id = None, tracker = None, status = None, page = 0):
+    def get_issues(self, project_id = None, tracker = None, status = None, page = 0, custom = None):
         """
         Get paginated list of all issues
         GET $base/issues.xml?page=$page&project_id=$project&tracker_id=$tracker&status_id=$status
@@ -210,10 +215,11 @@ class RedmineClient:
         True
         """
         url = "%s/issues.xml?key=%s&page=%d" % (self.base, self.key, page)
-        if type(project_id).__name__ == "int":
-            url = "%s&project_id=%d" % (url, project_id)
-        else:
-            url = "%s&project_id=%s" % (url, project_id)
+        if project_id is not None:
+            if type(project_id).__name__ == "int":
+                url = "%s&project_id=%d" % (url, project_id)
+            else:
+                url = "%s&project_id=%s" % (url, project_id)
         if tracker is not None:
             url = "%s&tracker_id=%d" % (url, tracker)
         if status is not None:
@@ -221,6 +227,10 @@ class RedmineClient:
                 url = "%s&status_id=%d" % (url, status)
             else:
                 url = "%s&status_id=%s" % (url, status)
+        if custom is not None:
+            if type(custom).__name__ == "dict":
+                for cf_id in custom:
+                    url = "%s&cf_%d=%s" % (url, cf_id, custom[cf_id])
         response, content = self.http.request(url, "GET")
         issues = []
         issuesRoot = minidom.parseString(content)
@@ -261,7 +271,7 @@ class RedmineClient:
         >>> i.add_element('description', value = 'Test')
         >>> i.add_element('custom_field', id = '1', value = 'http://somewhere.com/file.xls', is_custom = True)
         >>> i.to_xml()
-        '<?xml version="1.0" ?><issue><project_id>1</project_id><tracker id="3"/><status id="1"/><priority id="4"/><author id="3"/><subject>Test</subject><description>Test</description><custom_fields><custom_field id="1">http://somewhere.com/file.xls</custom_field></custom_fields></issue>'
+        '<?xml version="1.0" ?><issue><project_id>1</project_id><tracker id="3"/><status id="1"/><priority id="4"/><author id="3"/><subject>Test</subject><description>Test</description><custom_fields type="array"><custom_field id="1"><value>http://somewhere.com/file.xls</value></custom_field></custom_fields></issue>'
         >>> r.create_issue(i) is not None
         True
         """
