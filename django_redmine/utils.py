@@ -1,4 +1,5 @@
 import httplib2
+import urllib
 import sys
 from xml.dom import minidom
 
@@ -121,6 +122,14 @@ class RedmineClient:
         self.http.add_credentials(user, password)
         self.key = key
 
+    def _request(self, url, method, payload = None):
+        headers = {'X-Redmine-API-Key': self.key,
+                   'X-ChiliProject-API-Key': self.key}
+        if payload is not None:
+            headers['Content-Type'] = 'application/xml; charset=utf-8'
+        return self.http.request(url, method=method, body=payload, headers=headers)
+    
+    
     # ---- Projects ----
 
     def get_projects(self):
@@ -133,8 +142,8 @@ class RedmineClient:
         >>> len(p) > 0
         True
         """
-        url = "%s/projects.xml?key=%s" % (self.base, self.key)
-        response, content = self.http.request(url, "GET")
+        url = "%s/projects.xml" % self.base
+        response, content = self._request(url, "GET")
         projects = []
         projectsRoot = minidom.parseString(content)
         projectsList = projectsRoot.documentElement.getElementsByTagName('project')
@@ -148,10 +157,10 @@ class RedmineClient:
         GET $base/projects/$id.xml
         """
         if type(id).__name__ == "int":
-            url = "%s/projects/%d.xml?key=%s" % (self.base, id, self.key)
+            url = "%s/projects/%d.xml" % (self.base, id)
         else:
-            url = "%s/projects/%s.xml?key=%s" % (self.base, id, self.key)
-        response, content = self.http.request(url, "GET")
+            url = "%s/projects/%s.xml" % (self.base, id)
+        response, content = self._request(url, "GET")
         project = RedmineProject(None)
         project.parse(content)
         return project
@@ -161,8 +170,8 @@ class RedmineClient:
         Create a project
         POST $base/projects.xml
         """
-        url = "%s/projects.xml?key=" % (self.base, self.key)
-        response, content = self.http.request(url, "POST", project.to_xml())
+        url = "%s/projects.xml" % self.base
+        response, content = self._request(url, "POST", project.to_xml())
         if response.status == 201:
             new_project = RedmineProject(None)
             new_project.parse(content)
@@ -177,10 +186,10 @@ class RedmineClient:
         PUT $base/projects/$id.xml
         """
         if type(id).__name__ == "int":
-            url = "%s/projects/%d.xml?key=%s" % (self.base, id, self.key)
+            url = "%s/projects/%d.xml" % (self.base, id)
         else:
-            url = "%s/projects/%s.xml?key=%s" % (self.base, id, self.key)
-        response, content = self.http.request(url, "PUT", project.to_xml())
+            url = "%s/projects/%s.xml" % (self.base, id)
+        response, content = self._request(url, "PUT", project.to_xml())
         if response.status == 200:
             return True
         else:
@@ -192,10 +201,10 @@ class RedmineClient:
         DELETE $base/projects/$id.xml
         """
         if type(id).__name__ == "int":
-            url = "%s/projects/%d.xml?key=%s" % (self.base, id, self.key)
+            url = "%s/projects/%d.xml" % (self.base, id)
         else:
-            url = "%s/projects/%s.xml?key=%s" % (self.base, id, self.key)
-        response, content = self.http.request(url, "DELETE")
+            url = "%s/projects/%s.xml" % (self.base, id)
+        response, content = self._request(url, "DELETE")
         if response.status == 200:
             return True
         else:
@@ -214,24 +223,19 @@ class RedmineClient:
         >>> len(l) > 0
         True
         """
-        url = "%s/issues.xml?key=%s&page=%d" % (self.base, self.key, page)
+        urlArgs = {'key': self.key, 'page': page}
         if project_id is not None:
-            if type(project_id).__name__ == "int":
-                url = "%s&project_id=%d" % (url, project_id)
-            else:
-                url = "%s&project_id=%s" % (url, project_id)
+            urlArgs['project_id'] = project_id
         if tracker is not None:
-            url = "%s&tracker_id=%d" % (url, tracker)
+            urlArgs['tracker_id'] = tracker
         if status is not None:
-            if type(status).__name__ == "int":
-                url = "%s&status_id=%d" % (url, status)
-            else:
-                url = "%s&status_id=%s" % (url, status)
+            urlArgs['status_id'] = status
         if custom is not None:
             if type(custom).__name__ == "dict":
                 for cf_id in custom:
-                    url = "%s&cf_%d=%s" % (url, cf_id, custom[cf_id])
-        response, content = self.http.request(url, "GET")
+                    urlArgs['cf_%d' % cf_id] = custom[cf_id]
+        url = "%s/issues.xml?%s" % (self.base, urllib.urlencode(urlArgs))
+        response, content = self._request(url, "GET")
         issues = []
         issuesRoot = minidom.parseString(content)
         issuesList = issuesRoot.documentElement.getElementsByTagName('issue')
@@ -249,8 +253,8 @@ class RedmineClient:
         >>> i.get_element('id').firstChild.data
         u'12'
         """
-        url = "%s/issues/%d.xml?key=%s" % (self.base, id, self.key)
-        response, content = self.http.request(url, "GET")
+        url = "%s/issues/%d.xml" % (self.base, id)
+        response, content = self._request(url, "GET")
         issue = RedmineIssue(None)
         issue.parse(content)
         return issue
@@ -275,8 +279,8 @@ class RedmineClient:
         >>> r.create_issue(i) is not None
         True
         """
-        url = "%s/issues.xml?key=%s&project_id=%s" % (self.base, self.key, issue.project_id)
-        response, content = self.http.request(url, "POST", issue.to_xml(), headers={'Content-type': 'text/xml'})
+        url = "%s/issues.xml?project_id=%s" % (self.base, issue.project_id)
+        response, content = self._request(url, "POST", issue.to_xml())
         if response.status == 201:
             new_issue = RedmineIssue(None)
             new_issue.parse(content)
@@ -290,8 +294,8 @@ class RedmineClient:
         Update an issue
         PUT $base/issues/$id.xml
         """
-        url = "%s/issues/%d.xml?key=%s" % (self.base, id, self.key)
-        response, content = self.http.request(url, "PUT", issue.to_xml())
+        url = "%s/issues/%d.xml" % (self.base, id)
+        response, content = self._request(url, "PUT", issue.to_xml())
         if response.status == 200:
             return True
         else:
@@ -302,8 +306,8 @@ class RedmineClient:
         Delete an issue
         DELETE $base/issues/$id.xml
         """
-        url = "%s/issues/%d.xml?key=%s" % (self.base, id, self.key)
-        response, content = self.http.request(url, "DELETE")
+        url = "%s/issues/%d.xml" % (self.base, id)
+        response, content = self._request(url, "DELETE")
         if response.status == 200:
             return True
         else:
