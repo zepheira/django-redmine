@@ -1,5 +1,6 @@
 import httplib2
 import urllib
+import os
 import sys
 from xml.dom import minidom
 
