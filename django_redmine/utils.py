@@ -88,7 +88,7 @@ class RedmineUser(RedmineResource):
 
         >>> r = RedmineUser(None)
         >>> r.to_xml()
-        '<?xml version="1.0" ?><project/>'
+        '<?xml version="1.0" ?><user/>'
         """
         RedmineResource.__init__(self, None, user, 'user')
 
@@ -151,16 +151,43 @@ class RedmineClient:
     
     # ---- Users ----
 
-    def get_users(self):
+    def _get_users_single(self, urlArgs={}):
         """
+        Helper function for retrieving one set of users
         """
-        url = "%s/users.xml" % self.base
-        response, content = self._request(url, "GET")
         users = []
+        url = "%s/users.xml?%s" % (self.base, urllib.urlencode(urlArgs))
+        response, content = self._request(url, "GET")
         usersRoot = minidom.parseString(content)
-        usersList = usersRoot.documentElement.getElementsByTagName('users')
+        usersList = usersRoot.documentElement.getElementsByTagName('user')
         for user in usersList:
             users.append(RedmineUser(user))
+        totalCount = usersRoot.documentElement.getAttribute('total_count')
+        return (users, int(totalCount))
+
+    def get_users(self, offset=0, limit=None, all=False):
+        """
+        """
+        if all:
+            offset = 0
+            if limit is None:
+                limit = 100
+
+        urlArgs = {'offset': offset}
+        if limit is not None:
+            urlArgs['limit'] = limit
+
+        users, totalCount = self._get_users_single(urlArgs)
+
+        if all:
+            pages = totalCount / limit
+            if totalCount % limit != 0:
+                pages += 1
+            for i in range(2, pages + 1):
+                urlArgs['offset'] = (i - 1) * limit
+                more_users, tc = self._get_users_single(urlArgs)
+                users.extend(more_users)
+        
         return users
     
     
