@@ -80,6 +80,17 @@ class RedmineResource:
     def to_xml(self):
         return self.resource.toxml()
 
+class RedmineUser(RedmineResource):
+    def __init__(self, user = None):
+        """
+        Redmine user representation, tied to the API XML form.
+
+        >>> r = RedmineUser(None)
+        >>> r.to_xml()
+        '<?xml version="1.0" ?><project/>'
+        """
+        RedmineResource.__init__(self, None, user, 'user')
+
 class RedmineProject(RedmineResource):
     def __init__(self, project = None):
         """
@@ -115,10 +126,17 @@ class RedmineClient:
         """
         Talks to the API.
         """
+        # httplib2 uses its own CA file, which is dumb. Workaround for Ubuntu.
+        certfile = None
+        if os.path.isfile("/etc/ssl/certs/ca-certificates.crt"):
+            certfile = "/etc/ssl/certs/ca-certificates.crt"
         if base[-1] == '/':
             base = base[0:-1]
         self.base = base
-        self.http = httplib2.Http()
+        if certfile is not None:
+            self.http = httplib2.Http(ca_certs=certfile)
+        else:
+            self.http = httplib2.Http()
         self.http.add_credentials(user, password)
         self.key = key
 
@@ -128,6 +146,21 @@ class RedmineClient:
         if payload is not None:
             headers['Content-Type'] = 'application/xml; charset=utf-8'
         return self.http.request(url, method=method, body=payload, headers=headers)
+    
+    
+    # ---- Users ----
+
+    def get_users(self):
+        """
+        """
+        url = "%s/users.xml" % self.base
+        response, content = self._request(url, "GET")
+        users = []
+        usersRoot = minidom.parseString(content)
+        usersList = usersRoot.documentElement.getElementsByTagName('users')
+        for user in usersList:
+            users.append(RedmineUser(user))
+        return users
     
     
     # ---- Projects ----
