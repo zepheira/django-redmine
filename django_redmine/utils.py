@@ -91,7 +91,7 @@ class RedmineResource:
         return self.resource
 
     def to_xml(self):
-        return self.resource.toxml()
+        return self.resource.toxml().encode('ascii','xmlcharrefreplace')
 
 class RedmineUser(RedmineResource):
     def __init__(self, user=None):
