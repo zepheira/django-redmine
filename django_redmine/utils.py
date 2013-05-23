@@ -12,20 +12,22 @@ The API usage examples make use of ActiveResource libraries and the API
 is clearly geared towards making use of an underlying knowledge base of
 ActiveResource, so the description is a bit light on details.  As such,
 only the most vital portions of this library have tests associated with
-them, specifically issue creation.  There is an active bug around the
-use of custom fields in issue management.  Adding issue custom fields
-right now will do nothing.
+them, specifically issue creation.
 
 A Redmine URL, user, password, and user API key are needed to initialize
 the RedmineClient.  To run this set of doctests, you will have to supply
 them below as well.
+
+In order to use user impersonation with ChiliProject, you'll need to
+implement the support for it.  See:
+  https://github.com/zepheira/chiliproject_switch_user
 """
 
 class RedmineResource:
     """
     Base class, do not use directly.
     """
-    def __init__(self, document = None, node = None, root = None):
+    def __init__(self, document=None, node=None, root=None):
         self.document = document
         if self.document is None and node is not None:
             impl = minidom.getDOMImplementation()
@@ -35,7 +37,7 @@ class RedmineResource:
             impl = minidom.getDOMImplementation()
             self.resource = impl.createDocument(None, root, None)
 
-    def add_element(self, element, id = None, name = None, value = None, is_custom = False):
+    def add_element(self, element, id=None, name=None, value=None, is_custom=False):
         element = self.resource.createElement(element)
         if id is not None:
             if type(id).__name__ == "int":
@@ -74,6 +76,16 @@ class RedmineResource:
         else:
             return None
 
+    def get_custom_field(self, field_id):
+        els = self.resource.getElementsByTagName("custom_field")
+        for field in els:
+            if field.getAttribute("id") == field_id:
+                if field.firstChild.hasChildNodes():
+                    return field.firstChild.firstChild.data
+                else:
+                    return None
+        return None
+
     def parse(self, xml):
         self.resource = minidom.parseString(xml)
         return self.resource
@@ -82,7 +94,7 @@ class RedmineResource:
         return self.resource.toxml()
 
 class RedmineUser(RedmineResource):
-    def __init__(self, user = None):
+    def __init__(self, user=None):
         """
         Redmine user representation, tied to the API XML form.
 
@@ -92,8 +104,21 @@ class RedmineUser(RedmineResource):
         """
         RedmineResource.__init__(self, None, user, 'user')
 
+    def add_group(self, id):
+        group = self.resource.createElement('group')
+        group.setAttribute('id', id)
+        groupEl = self.resource.getElementsByTagName('groups')
+        if len(groupEl) > 0:
+            groupEl[0].appendChild(group)
+        else:
+            groupEl = self.resource.createElement('groups')
+            groupEl.setAttribute('type', 'array')
+            groupEl.appendChild(group)
+            self.resource.documentElement.appendChild(groupEl)
+
+
 class RedmineProject(RedmineResource):
-    def __init__(self, project = None):
+    def __init__(self, project=None):
         """
         Redmine project representation, tied to the API XML form.
 
@@ -104,7 +129,7 @@ class RedmineProject(RedmineResource):
         RedmineResource.__init__(self, None, project, 'project')
 
 class RedmineIssue(RedmineResource):
-    def __init__(self, issue = None):
+    def __init__(self, issue=None):
         """
         Redmine issue representation, tied to the API XML form.
 
@@ -141,17 +166,36 @@ class RedmineClient:
         self.http.add_credentials(user, password)
         self.key = key
 
-    def _request(self, url, method, payload = None):
+    def _request(self, url, method, payload=None, impersonate=None):
         headers = {'X-Redmine-API-Key': self.key,
                    'X-ChiliProject-API-Key': self.key}
+        if impersonate is not None:
+            headers['X-Redmine-Switch-User'] = impersonate
+            headers['X-ChiliProject-Switch-User'] = impersonate
         if payload is not None:
             headers['Content-Type'] = 'application/xml; charset=utf-8'
         return self.http.request(url, method=method, body=payload, headers=headers)
     
     
     # ---- Users ----
+    
+    def create_user(self, user):
+        """
+        Create a project
+        POST $base/users.xml
+        """
+        url = "%s/users.xml" % self.base
+        response, content = self._request(url, "POST", user.to_xml())
+        if response.status == 201:
+            new_user = RedmineUser(None)
+            new_user.parse(content)
+            return new_user.get_element('id')
+        else:
+            # It would be better to have details about failure modes here instead of a global None
+            return None
 
-    def _get_users_single(self, urlArgs={}):
+
+    def __get_users_single(self, urlArgs={}):
         """
         Helper function for retrieving one set of users
         """
@@ -167,6 +211,8 @@ class RedmineClient:
 
     def get_users(self, offset=0, limit=None, all=False):
         """
+        Return list of RedmineUser's in the system, optionally returning all
+        in one go or a subset dependent on offset and limit.
         """
         if all:
             offset = 0
@@ -177,7 +223,7 @@ class RedmineClient:
         if limit is not None:
             urlArgs['limit'] = limit
 
-        users, totalCount = self._get_users_single(urlArgs)
+        users, totalCount = self.__get_users_single(urlArgs)
 
         if all:
             pages = totalCount / limit
@@ -185,7 +231,7 @@ class RedmineClient:
                 pages += 1
             for i in range(2, pages + 1):
                 urlArgs['offset'] = (i - 1) * limit
-                more_users, tc = self._get_users_single(urlArgs)
+                more_users, tc = self.__get_users_single(urlArgs)
                 users.extend(more_users)
         
         return users
@@ -226,13 +272,13 @@ class RedmineClient:
         project.parse(content)
         return project
 
-    def create_project(self, project):
+    def create_project(self, project, as_user=None):
         """
         Create a project
         POST $base/projects.xml
         """
         url = "%s/projects.xml" % self.base
-        response, content = self._request(url, "POST", project.to_xml())
+        response, content = self._request(url, "POST", project.to_xml(), impersonate=as_user)
         if response.status == 201:
             new_project = RedmineProject(None)
             new_project.parse(content)
@@ -241,7 +287,7 @@ class RedmineClient:
             # It would be better to have details about failure modes here instead of a global None
             return None            
 
-    def update_project(self, id, project):
+    def update_project(self, id, project, as_user=None):
         """
         Update a project
         PUT $base/projects/$id.xml
@@ -250,7 +296,7 @@ class RedmineClient:
             url = "%s/projects/%d.xml" % (self.base, id)
         else:
             url = "%s/projects/%s.xml" % (self.base, id)
-        response, content = self._request(url, "PUT", project.to_xml())
+        response, content = self._request(url, "PUT", project.to_xml(), impersonate=as_user)
         if response.status == 200:
             return True
         else:
@@ -273,9 +319,9 @@ class RedmineClient:
 
     # ---- Issues ----
 
-    def get_issues(self, project_id = None, tracker = None, status = None, page = 0, custom = None):
+    def get_issues(self, project_id=None, tracker=None, status=None, page=0, custom=None):
         """
-        Get paginated list of all issues
+        Get paginated list of all issues, returns one page at a time
         GET $base/issues.xml?page=$page&project_id=$project&tracker_id=$tracker&status_id=$status
 
         Creating an issue should probably be part of this test...
@@ -320,7 +366,7 @@ class RedmineClient:
         issue.parse(content)
         return issue
 
-    def create_issue(self, issue):
+    def create_issue(self, issue, as_user=None):
         """
         Create an issue
         POST $base/issues.xml?project_id=$project_id
@@ -341,22 +387,22 @@ class RedmineClient:
         True
         """
         url = "%s/issues.xml?project_id=%s" % (self.base, issue.project_id)
-        response, content = self._request(url, "POST", issue.to_xml())
+        response, content = self._request(url, "POST", issue.to_xml(), impersonate=as_user)
         if response.status == 201:
             new_issue = RedmineIssue(None)
             new_issue.parse(content)
             return new_issue.get_element('id')
         else:
             # It would be better to have details about failure modes here instead of a global None
-            return None            
+            return None
 
-    def update_issue(self, id, issue):
+    def update_issue(self, id, issue, as_user=None):
         """
         Update an issue
         PUT $base/issues/$id.xml
         """
         url = "%s/issues/%d.xml" % (self.base, id)
-        response, content = self._request(url, "PUT", issue.to_xml())
+        response, content = self._request(url, "PUT", issue.to_xml(), impersonate=as_user)
         if response.status == 200:
             return True
         else:
