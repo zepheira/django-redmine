@@ -79,7 +79,7 @@ class RedmineResource:
     def get_custom_field(self, field_id):
         els = self.resource.getElementsByTagName("custom_field")
         for field in els:
-            if field.getAttribute("id") == field_id:
+            if int(field.getAttribute("id")) == int(field_id):
                 if field.firstChild.hasChildNodes():
                     return field.firstChild.firstChild.data
                 else:
