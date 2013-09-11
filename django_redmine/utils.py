@@ -86,6 +86,15 @@ class RedmineResource:
                     return None
         return None
 
+    def get_child_issue_ids(self):
+        children_el = self.resource.getElementsByTagName("children")
+        child_issues = []
+        if len(children_el) == 1:
+            child_issues_els = children_el[0].getElementsByTagName("issue")
+            for child_el in child_issues_els:
+                child_issues.append(int(child_el.getAttribute("id")))
+        return child_issues
+
     def parse(self, xml):
         self.resource = minidom.parseString(xml)
         return self.resource
@@ -350,17 +359,19 @@ class RedmineClient:
             issues.append(RedmineIssue(issue))
         return issues
 
-    def get_issue(self, id):
+    def get_issue(self, id, include=None):
         """
         Get one issue
         GET $base/issues/$id.xml
 
         >>> r = RedmineClient('http://redmine.example.com', 'test_username', 'test_password', 'test_key')
-        >>> i = r.get_issue(12)
+        >>> i = r.get_issue(12, include=['children'])
         >>> i.get_element('id').firstChild.data
         u'12'
         """
         url = "%s/issues/%d.xml" % (self.base, id)
+        if include is not None:
+            url = "%s?include=%s" % (url, ",".join(include))
         response, content = self._request(url, "GET")
         issue = RedmineIssue(None)
         issue.parse(content)
